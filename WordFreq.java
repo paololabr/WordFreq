@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
@@ -47,13 +48,31 @@ public class WordFreq {
         for(Integer v : h.values()) 
         	add(t,v);
         
-        System.out.println("Processed " + LANG +" txt files: "+ txtList.size());
-        System.out.println("Decompressed zip files: "+ zipCount);
+        FileWriter fw = new FileWriter("result.txt");       
+    	
+        fw.write("Processed " + LANG +" txt files: "+ txtList.size() + "\n");
+        fw.write("Decompressed zip files: " + zipCount  + "\n");
+        fw.write("Words: " + h.size()  + "\n\n");
+        
+        fw.write("Freq.\tFreq. of Freq.\n\n");
+        for (Object o : t.keySet())
+        {
+        	fw.write(o.toString() + "\t" + t.get(o));
+			fw.write("\n");        	 
+        }     
+    	
+    	fw.close(); 
+    	
+    	FileWriter fl = new FileWriter("fileList.txt");  
+    	for(String txt : txtList)    	
+    		fl.write(txt + "\n");
+    	fl.close();
+    	
 	}
 	
 	private static void ProcessFile(Path f,  Map<Object,Integer> h, HashSet<String> fl) throws IOException
-	{	
-		if (f.toString().toLowerCase().endsWith(".txt") && !fl.contains(f.toString().toLowerCase()))
+	{			
+		if (f.toString().toLowerCase().endsWith(".txt") && !fl.contains(f.getFileName().toString().toLowerCase()))
 		{
 			BufferedReader in = new BufferedReader(new FileReader(f.toString(), Charset.forName(DEFAULT_ENCODING)));
 			String encod = checkTxt(in, LANG);
@@ -61,7 +80,7 @@ public class WordFreq {
         	{
 				BufferedReader inBuff = new BufferedReader(new FileReader(f.toString(),Charset.forName(encod)));
 				read(inBuff, h);
-				fl.add(f.toString().toLowerCase());
+				fl.add(f.getFileName().toString().toLowerCase());
         	}
 		} else if (f.toString().toLowerCase().endsWith(".zip"))
 		{		
@@ -161,12 +180,12 @@ public class WordFreq {
             	 else if (enc.compareToIgnoreCase("UTF?8") == 0)
             		 enc = "UTF-8";
             	 else if (enc.compareToIgnoreCase("ISO-8858-1") == 0)	// non esiste ISO-8858-1 forse il ISO 8859-1 ?
-            		 enc = "ISO 8859-1";
+            		 enc = "ISO-8859-1";
             	 
             	 try {
             		 Charset inputCharset = Charset.forName(enc);
             	 } catch(Exception e) {
-            		 System.out.println("ignored encoding " + enc + "assigned to " + DEFAULT_ENCODING);
+            		 System.out.println("ignored encoding " + enc + " assigned to " + DEFAULT_ENCODING);
             		 enc = DEFAULT_ENCODING;
             		 if (lang != "")
             			 return enc;
