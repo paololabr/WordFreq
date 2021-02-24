@@ -16,11 +16,13 @@ import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 public class WordFreq {
-	final static String delim =" ,.;?!\"\'";
+	final static String DELIM =" ,.;?!\"\'";
 	final static String LANG = "English";
+	final static String DEFAULT_ENCODING = "UTF-8";
 	
 	static int zipCount = 0;
 		 
@@ -53,7 +55,7 @@ public class WordFreq {
 	{	
 		if (f.toString().toLowerCase().endsWith(".txt") && !fl.contains(f.toString().toLowerCase()))
 		{
-			BufferedReader in = new BufferedReader(new FileReader(f.toString()));
+			BufferedReader in = new BufferedReader(new FileReader(f.toString(), Charset.forName(DEFAULT_ENCODING)));
 			String encod = checkTxt(in, LANG);
 			if (!encod.isEmpty())
         	{
@@ -62,8 +64,7 @@ public class WordFreq {
 				fl.add(f.toString().toLowerCase());
         	}
 		} else if (f.toString().toLowerCase().endsWith(".zip"))
-		{
-			//System.out.println("file "+ f.getFileName());			
+		{		
 			Unzip(f.toString(), h, fl);
 		}	
 	}
@@ -71,15 +72,22 @@ public class WordFreq {
 	private static void read(BufferedReader in, Map<Object,Integer> h)
 	{
 	         try {
+	        	 boolean startFound = false;
 	             String line = in.readLine();
 	             while(line!=null){
-	                  StringTokenizer st = new StringTokenizer(line, delim);
-	                  while(st.hasMoreTokens())
-	                   	  add(h, st.nextToken());
+	            	 if (line.startsWith("***END") || line.startsWith("*** END"))
+            			 break;
+	            	 
+	            	 if (startFound) {	            		 
+		                  StringTokenizer st = new StringTokenizer(line, DELIM);
+		                  while(st.hasMoreTokens())
+		                   	  add(h, st.nextToken());
+	            	 } else if (line.startsWith("***START") || line.startsWith("*** START"))
+	            		 startFound = true;
 	                  
 	                  line = in.readLine();
 	             }
-	             //System.out.println("file "+ f.getFileName().toString() +": inserite "+h.size() +" parole");
+	             
 	             in.close();
 	         } catch(IOException e) {
 	        	 e.printStackTrace();
@@ -87,17 +95,10 @@ public class WordFreq {
 	}
 	
 	private static void add(Map<Object,Integer> m, Object v)
-	{
-		/*
-        Integer o = m.get(v);
-        if(o==null)
-        	m.put(v,1);
-        else 
-        	m.put(v,o+1);*/
-        
-        Integer o1 = m.putIfAbsent(v,1);
-        if (o1 != null)
-        	m.put(v, o1+1);
+	{        
+        Integer o = m.putIfAbsent(v,1);
+        if (o != null)
+        	m.put(v, o+1);
     }
 	
 	private static void Unzip (String zipFile, Map<Object,Integer> h, HashSet<String> fl) throws IOException {
@@ -109,13 +110,17 @@ public class WordFreq {
         	
         	if (st.endsWith(".txt") && !fl.contains(st))
     		{
-	        	BufferedReader in = new BufferedReader(new InputStreamReader(zis, "UTF-8"));
+	        	BufferedReader in = new BufferedReader(new InputStreamReader(zis, DEFAULT_ENCODING));
 	        	String encod = checkTxt(in, LANG);
 	        	if (!encod.isEmpty())
 	        	{	        	
-	        		BufferedReader inBuff = new BufferedReader(new InputStreamReader(zis, encod));
+	        		ZipFile zip = new ZipFile(zipFile);
+	        		ZipEntry entry = zip.getEntry(zipEntry.getName());
+	        		
+	        		BufferedReader inBuff = new BufferedReader(new InputStreamReader(zip.getInputStream(entry), encod));
 		        	read(inBuff, h);		        	
 		        	fl.add(st);
+		        	zip.close();
 	        	}
     		}        	
         	zipEntry = zis.getNextEntry();
@@ -151,21 +156,22 @@ public class WordFreq {
             		 enc = "US-ASCII";
             	 else if (enc.compareToIgnoreCase("Unicode UTF-8") == 0)
             		 enc = "UTF-8";
-            	 else if (enc.compareToIgnoreCase("IDO-8859-1") == 0)
+            	 else if (enc.compareToIgnoreCase("IDO-8859-1") == 0)	// scritto male
             		 enc = "ISO-8859-1";
             	 else if (enc.compareToIgnoreCase("UTF?8") == 0)
             		 enc = "UTF-8";
+            	 else if (enc.compareToIgnoreCase("ISO-8858-1") == 0)	// non esiste ISO-8858-1 forse il ISO 8859-1 ?
+            		 enc = "ISO 8859-1";
             	 
             	 try {
             		 Charset inputCharset = Charset.forName(enc);
             	 } catch(Exception e) {
-            		 System.out.println("ignored encoding " + enc);
-            		 return "";
-            	 }
-            	 
-            	 // UTF?8
-            	 // ISO-8858-1
-            	 // IDO-8859-1
+            		 System.out.println("ignored encoding " + enc + "assigned to " + DEFAULT_ENCODING);
+            		 enc = DEFAULT_ENCODING;
+            		 if (lang != "")
+            			 return enc;
+            	 }            	 
+            	
             	 // US-ASCII, MIDI, Lilypond, MP3 and TeX
             	 
             	 if (lang != "")
