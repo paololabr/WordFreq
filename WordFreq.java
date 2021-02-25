@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
@@ -24,13 +25,19 @@ public class WordFreq {
 	final static String DELIM =" ,.;?!\"\'";
 	final static String LANG = "English";
 	final static String DEFAULT_ENCODING = "UTF-8";
-	
-	static int zipCount = 0;
+	final static String DEFAULT_DIR = "./pgdvd042010";
 		 
 	public static void main(String[] args) throws IOException{
-		String path = "./docu";
-		Map<Object,Integer> h = new HashMap<Object,Integer>();
-		HashSet<String> txtList = new HashSet<String>();		
+		String path = DEFAULT_DIR;
+		if ( args.length > 0 && !args[0].trim().isEmpty()) 
+			path = args[0];
+		
+		AtomicLong zipCount = new AtomicLong();
+		long tokensCount = 0;
+		
+		Map<Object,Integer> h = new HashMap<Object,Integer>();	// token, freq.
+		Map<Object,Integer> t = new TreeMap<Object,Integer>();	// words, freq.
+		HashSet<String> txtList = new HashSet<String>();		// txt file list		
 		
 		Files.walk(Paths.get(path))
 		.filter(Files::isReadable)
@@ -38,28 +45,29 @@ public class WordFreq {
         .filter(file -> (file.toString().toLowerCase().endsWith(".txt") || file.toString().toLowerCase().endsWith(".zip")))
         .forEach(file -> {
 			try {
-				ProcessFile(file, h, txtList);
+				ProcessFile(file, h, txtList, zipCount);
 			} catch (IOException e) {
-				
+				e.printStackTrace();
 			}
-		});     
+		}); 
 		
-        Map<Object,Integer> t = new TreeMap<Object,Integer>();
+       
         for(Integer v : h.values()) 
-        	add(t,v);
-        
-        FileWriter fw = new FileWriter("result.txt");       
-    	
-        fw.write("Processed " + LANG +" txt files: "+ txtList.size() + "\n");
-        fw.write("Decompressed zip files: " + zipCount  + "\n");
-        fw.write("Words: " + h.size()  + "\n\n");
-        
-        fw.write("Freq.\tFreq. of Freq.\n\n");
-        for (Object o : t.keySet())
         {
-        	fw.write(o.toString() + "\t" + t.get(o));
-			fw.write("\n");        	 
-        }     
+        	add(t,v);
+        	tokensCount+=v;
+        }
+        
+        FileWriter fw = new FileWriter("result.txt");   
+    	
+        fw.write("Unique Txt files ("+ LANG + "):\t" + txtList.size() + "\n");
+        fw.write("Zip files:\t" + zipCount.get()  + "\n");
+        fw.write("Tokens:\t" + tokensCount  + "\n");
+        fw.write("Words:\t" + h.size()  + "\n\n");
+        
+        fw.write("Word\t\tFreq\n\n");
+        for (Object o : t.keySet())
+        	fw.write(o.toString() + "\t\t" + t.get(o) + "\n");
     	
     	fw.close(); 
     	
@@ -70,7 +78,7 @@ public class WordFreq {
     	
 	}
 	
-	private static void ProcessFile(Path f,  Map<Object,Integer> h, HashSet<String> fl) throws IOException
+	private static void ProcessFile(Path f,  Map<Object,Integer> h, HashSet<String> fl, AtomicLong zipCount) throws IOException
 	{			
 		if (f.toString().toLowerCase().endsWith(".txt") && !fl.contains(f.getFileName().toString().toLowerCase()))
 		{
@@ -80,37 +88,39 @@ public class WordFreq {
         	{
 				BufferedReader inBuff = new BufferedReader(new FileReader(f.toString(),Charset.forName(encod)));
 				read(inBuff, h);
-				fl.add(f.getFileName().toString().toLowerCase());
+				fl.add(f.getFileName().toString().toLowerCase());				
         	}
 		} else if (f.toString().toLowerCase().endsWith(".zip"))
 		{		
 			Unzip(f.toString(), h, fl);
-		}	
+			zipCount.incrementAndGet();
+		}		
 	}
 	
 	private static void read(BufferedReader in, Map<Object,Integer> h)
 	{
-	         try {
-	        	 boolean startFound = false;
-	             String line = in.readLine();
-	             while(line!=null){
-	            	 if (line.startsWith("***END") || line.startsWith("*** END"))
-            			 break;
+	     try {
+	       	 boolean startFound = false;
+	         String line = in.readLine();
+	         while(line!=null)
+	         {
+	        	 if (line.startsWith("***END") || line.startsWith("*** END"))
+         		 break;
 	            	 
-	            	 if (startFound) {	            		 
-		                  StringTokenizer st = new StringTokenizer(line, DELIM);
-		                  while(st.hasMoreTokens())
-		                   	  add(h, st.nextToken());
-	            	 } else if (line.startsWith("***START") || line.startsWith("*** START"))
-	            		 startFound = true;
-	                  
-	                  line = in.readLine();
-	             }
+		       	 if (startFound) {	            		 
+			         StringTokenizer st = new StringTokenizer(line, DELIM);
+			         while(st.hasMoreTokens())
+			        	  add(h, st.nextToken());
+		       	 } else if (line.startsWith("***START") || line.startsWith("*** START"))
+		           	startFound = true;	                  
+		            line = in.readLine();
+	         }
 	             
-	             in.close();
-	         } catch(IOException e) {
-	        	 e.printStackTrace();
-	        }
+	         in.close();
+	     }
+	     	 catch(IOException e) {
+	     		e.printStackTrace();
+	     }
 	}
 	
 	private static void add(Map<Object,Integer> m, Object v)
@@ -121,7 +131,6 @@ public class WordFreq {
     }
 	
 	private static void Unzip (String zipFile, Map<Object,Integer> h, HashSet<String> fl) throws IOException {
-		zipCount++;
 		ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
         ZipEntry zipEntry = zis.getNextEntry();
         while (zipEntry != null) {
