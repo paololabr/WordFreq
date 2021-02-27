@@ -65,9 +65,10 @@ public class WordFreq {
         fw.write("Tokens:\t" + tokensCount  + "\n");
         fw.write("Words:\t" + h.size()  + "\n\n");
         
-        fw.write("Word\t\tFreq\n\n");
+        fw.write("Words\t\tFreq\n\n");
         for (Object o : t.keySet())
-        	fw.write(o.toString() + "\t\t" + t.get(o) + "\n");
+        	fw.write(t.get(o) + "\t\t" + o.toString() + "\n");
+        	//fw.write(o.toString() + "\t\t" + t.get(o) + "\n");
     	
     	fw.close(); 
     	
